@@ -9,11 +9,12 @@ using System.Text;
 
 class Program
 {
-    public static string ver = "2.9";
+    public static string ver = "3.1";
     public static bool UserCancel = false;
     public static bool cmdstatus = false;
     public static bool UserCancelok = true;
     public static bool sodoflg = false;
+    public static bool sodoflg2 = false;
     public static bool cmdwriteflg = false;
     public static bool KSrunas = false;
     public static string username = Environment.UserName;
@@ -48,19 +49,33 @@ class Program
         //引数にファイルが指定されている
         if (args.Any())
         {
-            if (args[0] == "KSrunas"){//sudoで実行
-                CmdDir = args[2];
-                command = args[1];
-                LogFile = args[3];
 
-                if (args[1] == "KSrunas"){
-                    KSrunas = false;
-                }else{
+                if (args[0] == "KSrunas"){//sudoで実行
+                    CmdDir = args[2];
+                    command = args[1];
+                    LogFile = args[3];
                     KSrunas = true;
                     Console.WriteLine(CmdDir+"># "+command);
-                }
 
-            }else{ //ファイルをクリックして実行
+                }else if (args[0] == "KSrunas2"){
+                    CmdDir = args[1];
+                    LogFile = args[2];
+
+                } else if (args[0] == "mun") {
+                    command = args[1];
+                    LogFile = args.Length > 2 ? args[2] : @"C:\Users\"+username+@"\AppData\Local\KayamaSoft\Cwl\cmd_tmp\"+logdatetime2()+"_cmd-with-logging.txt";;
+                    CmdDir = args.Length > 3 ? args[3] : @"C:\Windows\System32";
+                    KSrunas = true;
+                    Console.WriteLine("Welcome to Cmd with logging v"+ver);
+                    Console.WriteLine("Log File > "+LogFile);
+                    Console.WriteLine("ログの保存先を変更する時は\"log change\"と入力してください。詳細は\"log help\"をご確認ください。");
+                    Console.WriteLine("");
+                    Console.WriteLine(CmdDir+"> "+command);
+                    File.AppendAllText(LogFile, "Cmd with logging v"+ver+"\r\n");
+                    File.AppendAllText(LogFile, timezonename()+"\r\n\r\n");
+                    File.AppendAllText(LogFile,  "["+logdatetime()+"]"+cmdline+" "+CmdDir+">"+cmdline+"\r\n");
+
+                } else { //ファイルをクリックして実行
                 string filePath = args[0];
                 string tmpdatetime = logdatetime2();
                 string tmppath = @"C:\Users\"+username+@"\AppData\Local\KayamaSoft\Cwl\bat_tmp\"+tmpdatetime+"_"+System.IO.Path.GetFileNameWithoutExtension(filePath)+".bat";
@@ -94,6 +109,7 @@ class Program
         {
             cmdstatus = false;//cancelフラグ
             sodoflg = false;//sudoフラグ
+            sodoflg2 = false;//sudo su フラグ
             cmdwriteflg = false;//コマンド記載フラグ
 
             if(IsAdministrator()){
@@ -119,7 +135,20 @@ class Program
             }
 
             //sudoコマンド
-            if (command.StartsWith("su"))
+            if (command.StartsWith("sudo su"))
+            {   
+                sodoflg2 = true;
+                cmdwriteflg = true;
+                File.AppendAllText(LogFile, "["+logdatetime()+"]"+cmdline+" "+CmdDir+">"+cmdline+command+"\r\n");
+                if (command.Substring(2) == ""){
+                    command = "KSrunas2";
+                }else{
+                    command = command.Substring(3);
+                }
+            }
+
+            //sudoコマンド
+            if (command.StartsWith("sudo"))
             {   
                 sodoflg = true;
                 cmdwriteflg = true;
@@ -127,7 +156,7 @@ class Program
                 if (command.Substring(2) == ""){
                     command = "KSrunas";
                 }else{
-                    command = command.Substring(3);
+                    command = command.Substring(5);
                 }
             }
 
@@ -265,6 +294,11 @@ class Program
             {
                 //管理者権限で実行
                 Runsudo(command,CmdDir,LogFile);
+            }
+            else if (sodoflg2)
+            {
+                //管理者権限で実行
+                Runsudo2(command,CmdDir,LogFile);
             }
             else
             {
@@ -432,7 +466,7 @@ class Program
     {
         string vermsg = "                                Cmd with logging v"+ver+@"
 
-                Copyright (c) Cmd with logging , 2024 KAYAMA SOFT. Co., Ltd. All rights reserved.
+                Copyright (c) Cmd with logging , 2025 KayamaSoft. Co., Ltd. All rights reserved.
 
                             Contact us : hello@kayamasoft.org
 
@@ -492,9 +526,11 @@ log ver
 log logo
   このツールのロゴマークを確認できます。
 
-su
+sudo <command>
   コマンドを管理者権限で実行することができます。
 
+sudo su
+  コマンドを管理者権限で実行することができます。
 ";
         File.AppendAllText(LogFile, "["+logdatetime()+"]"+cmdline+" "+cmdmsg);
         Console.WriteLine(cmdmsg);
@@ -561,6 +597,36 @@ su
             File.AppendAllText(LogFile, "["+logdatetime()+"]"+cmdline+" \r\n");
         }
     }
+
+    static void Runsudo2(string command, string CmdDir, string LogFile)
+    {
+        //管理者として自分自身を起動する
+        System.Diagnostics.ProcessStartInfo psi =
+            new System.Diagnostics.ProcessStartInfo();
+
+        psi.UseShellExecute = true;
+
+        psi.FileName = Application.ExecutablePath;
+        
+        psi.Verb = "runas";
+        //引数を設定する
+        psi.Arguments = "KSrunas2 \""+CmdDir+"\" \""+LogFile+"\" \"";
+
+        try
+        {
+            //起動する
+            System.Diagnostics.Process.Start(psi);
+            Environment.Exit(0);
+        }
+        catch (System.ComponentModel.Win32Exception)// ex
+        {
+            Console.WriteLine("Permission denied");
+            Console.WriteLine("");
+            File.AppendAllText(LogFile, "["+logdatetime()+"]"+cmdline+" "+"Permission denied\r\n");
+            File.AppendAllText(LogFile, "["+logdatetime()+"]"+cmdline+" \r\n");
+        }
+    }
+
     public static bool IsAdministrator()
     {
         //現在のユーザーを表すWindowsIdentityオブジェクトを取得する
