@@ -467,8 +467,10 @@ class Program
         string vermsg = "                                Cmd with logging v"+ver+@"
 
                 Copyright (c) Cmd with logging , 2025 KayamaSoft. Co., Ltd. All rights reserved.
+		Licensed under the Apache License, Version 2.0
 
                             Contact us : hello@kayamasoft.org
+			    https://www.apache.org/licenses/LICENSE-2.0
 
 ";
         File.AppendAllText(LogFile, "["+logdatetime()+"]"+cmdline+" "+vermsg);
